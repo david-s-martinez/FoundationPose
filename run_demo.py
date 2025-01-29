@@ -10,11 +10,15 @@
 from estimater import *
 from datareader import *
 import argparse
-
+import trimesh
 
 if __name__=='__main__':
   parser = argparse.ArgumentParser()
   code_dir = os.path.dirname(os.path.realpath(__file__))
+  # parser.add_argument('--mesh_file', type=str, default=f'{code_dir}/demo_data/kinect_driller_seq/mesh/textured_mesh.obj')
+  # parser.add_argument('--test_scene_dir', type=str, default=f'{code_dir}/demo_data/kinect_driller_seq')
+  # parser.add_argument('--mesh_file', type=str, default=f'{code_dir}/demo_data/mustard0/mesh/textured_simple.obj')
+  # parser.add_argument('--test_scene_dir', type=str, default=f'{code_dir}/demo_data/mustard0')
   parser.add_argument('--mesh_file', type=str, default=f'{code_dir}/demo_data/hammer/mesh/textured.obj')
   parser.add_argument('--test_scene_dir', type=str, default=f'{code_dir}/demo_data/hammer')
   parser.add_argument('--est_refine_iter', type=int, default=5)
@@ -26,14 +30,54 @@ if __name__=='__main__':
   set_logging_format()
   set_seed(0)
 
-  mesh = trimesh.load(args.mesh_file)
 
   debug = args.debug
   debug_dir = args.debug_dir
   os.system(f'rm -rf {debug_dir}/* && mkdir -p {debug_dir}/track_vis {debug_dir}/ob_in_cam')
 
-  to_origin, extents = trimesh.bounds.oriented_bounds(mesh)
-  bbox = np.stack([-extents/2, extents/2], axis=0).reshape(2,3)
+  # mesh = trimesh.load(args.mesh_file, file_type="obj")
+  mesh = trimesh.load(args.mesh_file)
+  print(mesh.visual.material)
+  origin_frame = trimesh.creation.axis(origin_size=0.003)  # Adjust size for better visibility
+
+  bbox_visual = mesh.bounding_box_oriented  # Get OBB mesh
+  to_origin = bbox_visual.primitive.transform  # Directly gives the bbox pose
+  extents = bbox_visual.extents  # Bounding box dimensions
+
+  bbox_visual.visual.face_colors = [0, 255, 0, 50]
+  
+  bbox_corners = bbox_visual.vertices
+  bbox_corners = trimesh.transform_points(bbox_corners, np.linalg.inv(to_origin))
+  bbox = np.array([bbox_corners.min(axis=0), bbox_corners.max(axis=0)])
+  # Create a coordinate frame at the bounding box center
+  bbox_frame = trimesh.creation.axis(origin_size=0.005)
+  bbox_frame.apply_transform(to_origin)
+
+  # Create a scene with mesh, bounding box, and frames
+  scene = trimesh.Scene([mesh, origin_frame, bbox_visual, bbox_frame])
+
+  # Show the scene
+  scene.show()
+
+  ##############ALSO WORKS######################
+  # to_origin, extents = trimesh.bounds.oriented_bounds(mesh)
+
+  # bbox_visual = mesh.bounding_box_oriented
+  # bbox_visual.visual.face_colors = [0, 255, 0, 50]
+  
+  # bbox = np.stack([-extents/2, extents/2], axis=0).reshape(2,3)
+
+  # # Create a coordinate frame at the bounding box center
+  # bbox_frame = trimesh.creation.axis(origin_size=0.005)
+  # bbox_frame.apply_transform(np.linalg.inv(to_origin))
+
+  # # Create a scene with mesh, bounding box, and frames
+  # scene = trimesh.Scene([mesh, origin_frame, bbox_visual, bbox_frame])
+
+  # # Show the scene
+  # scene.show()
+  # to_origin = np.linalg.inv(to_origin)
+  ##############ALSO WORKS######################
 
   scorer = ScorePredictor()
   refiner = PoseRefinePredictor()
@@ -66,9 +110,11 @@ if __name__=='__main__':
     np.savetxt(f'{debug_dir}/ob_in_cam/{reader.id_strs[i]}.txt', pose.reshape(4,4))
 
     if debug>=1:
-      center_pose = pose@np.linalg.inv(to_origin)
+      center_pose = pose@to_origin
+      mesh_pose = pose
       vis = draw_posed_3d_box(reader.K, img=color, ob_in_cam=center_pose, bbox=bbox)
-      vis = draw_xyz_axis(color, ob_in_cam=center_pose, scale=0.1, K=reader.K, thickness=3, transparency=0, is_input_rgb=True)
+      vis = draw_xyz_axis(color, ob_in_cam=mesh_pose, scale=0.1, K=reader.K, thickness=3, transparency=0, is_input_rgb=True)
+      vis = draw_xyz_axis(vis, ob_in_cam=center_pose, scale=0.1, K=reader.K, thickness=3, transparency=0, is_input_rgb=True)
       cv2.imshow('1', vis[...,::-1])
       cv2.waitKey(0)
 
