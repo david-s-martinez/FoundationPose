@@ -11,7 +11,7 @@ from estimater import *
 from datareader import *
 import argparse
 import trimesh
-
+import json
 if __name__=='__main__':
   parser = argparse.ArgumentParser()
   code_dir = os.path.dirname(os.path.realpath(__file__))
@@ -19,8 +19,14 @@ if __name__=='__main__':
   # parser.add_argument('--test_scene_dir', type=str, default=f'{code_dir}/demo_data/kinect_driller_seq')
   # parser.add_argument('--mesh_file', type=str, default=f'{code_dir}/demo_data/mustard0/mesh/textured_simple.obj')
   # parser.add_argument('--test_scene_dir', type=str, default=f'{code_dir}/demo_data/mustard0')
-  parser.add_argument('--mesh_file', type=str, default=f'{code_dir}/demo_data/hammer/mesh/textured.obj')
-  parser.add_argument('--test_scene_dir', type=str, default=f'{code_dir}/demo_data/hammer')
+  parser.add_argument('--mesh_file', type=str, default=f'{code_dir}/demo_data/048_hammer/mesh/textured.obj')
+  parser.add_argument('--test_scene_dir', type=str, default=f'{code_dir}/demo_data/048_hammer')
+  # parser.add_argument('--mesh_file', type=str, default=f'{code_dir}/demo_data/010_potted_meat_can/mesh/textured.obj')
+  # parser.add_argument('--test_scene_dir', type=str, default=f'{code_dir}/demo_data/010_potted_meat_can')
+  # parser.add_argument('--mesh_file', type=str, default=f'{code_dir}/demo_data/033_spatula/mesh/textured.obj')
+  # parser.add_argument('--test_scene_dir', type=str, default=f'{code_dir}/demo_data/033_spatula')
+  # parser.add_argument('--mesh_file', type=str, default=f'{code_dir}/demo_data/025_mug/mesh/textured.obj')
+  # parser.add_argument('--test_scene_dir', type=str, default=f'{code_dir}/demo_data/025_mug')
   parser.add_argument('--est_refine_iter', type=int, default=5)
   parser.add_argument('--track_refine_iter', type=int, default=2)
   parser.add_argument('--debug', type=int, default=1)
@@ -91,6 +97,10 @@ if __name__=='__main__':
     logging.info(f'i:{i}')
     color = reader.get_color(i)
     depth = reader.get_depth(i)
+
+    # depth_vis = cv2.normalize(depth, None, 0, 255, cv2.NORM_MINMAX)
+    # cv2.imshow('depth_viz', cv2.applyColorMap(cv2.convertScaleAbs(depth_vis), cv2.COLORMAP_JET))
+    # cv2.waitKey(0)
     if i==0:
       mask = reader.get_mask(0).astype(bool)
       pose = est.register(K=reader.K, rgb=color, depth=depth, ob_mask=mask, iteration=args.est_refine_iter)
@@ -108,9 +118,18 @@ if __name__=='__main__':
 
     os.makedirs(f'{debug_dir}/ob_in_cam', exist_ok=True)
     np.savetxt(f'{debug_dir}/ob_in_cam/{reader.id_strs[i]}.txt', pose.reshape(4,4))
+    # mesh in cam frame
+    if i ==0:
+      data = {
+      "cam_T_mesh":pose.reshape(4,4).tolist(),
+      "frame":os.path.basename(reader.color_files[i]),
+      "object_id":os.path.basename(args.test_scene_dir)
+      }
+      with open(args.test_scene_dir+f'/{data["object_id"]}.json', 'w') as fp:
+        json.dump(data, fp, indent=4)
 
     if debug>=1:
-      center_pose = pose@to_origin
+      center_pose = pose@to_origin # cam_T_bbox = cam_T_mesh @ mesh_T_bbox
       mesh_pose = pose
       vis = draw_posed_3d_box(reader.K, img=color, ob_in_cam=center_pose, bbox=bbox)
       vis = draw_xyz_axis(color, ob_in_cam=mesh_pose, scale=0.1, K=reader.K, thickness=3, transparency=0, is_input_rgb=True)
