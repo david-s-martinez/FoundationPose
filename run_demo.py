@@ -15,18 +15,20 @@ import json
 if __name__=='__main__':
   parser = argparse.ArgumentParser()
   code_dir = os.path.dirname(os.path.realpath(__file__))
-  # parser.add_argument('--mesh_file', type=str, default=f'{code_dir}/demo_data/kinect_driller_seq/mesh/textured_mesh.obj')
-  # parser.add_argument('--test_scene_dir', type=str, default=f'{code_dir}/demo_data/kinect_driller_seq')
-  # parser.add_argument('--mesh_file', type=str, default=f'{code_dir}/demo_data/mustard0/mesh/textured_simple.obj')
-  # parser.add_argument('--test_scene_dir', type=str, default=f'{code_dir}/demo_data/mustard0')
-  parser.add_argument('--mesh_file', type=str, default=f'{code_dir}/demo_data/048_hammer/mesh/textured.obj')
-  parser.add_argument('--test_scene_dir', type=str, default=f'{code_dir}/demo_data/048_hammer')
-  # parser.add_argument('--mesh_file', type=str, default=f'{code_dir}/demo_data/010_potted_meat_can/mesh/textured.obj')
-  # parser.add_argument('--test_scene_dir', type=str, default=f'{code_dir}/demo_data/010_potted_meat_can')
-  # parser.add_argument('--mesh_file', type=str, default=f'{code_dir}/demo_data/033_spatula/mesh/textured.obj')
-  # parser.add_argument('--test_scene_dir', type=str, default=f'{code_dir}/demo_data/033_spatula')
-  # parser.add_argument('--mesh_file', type=str, default=f'{code_dir}/demo_data/025_mug/mesh/textured.obj')
-  # parser.add_argument('--test_scene_dir', type=str, default=f'{code_dir}/demo_data/025_mug')
+  user_home = "/home/david.martinez"
+  scene_name = "img_ycb_scene"
+  ycb_base_path = f"{user_home}/isaac_sim_grasping/gazebo-objects/objects_gazebo/ycb/"
+  frame_to_estimate = 13
+  # obj_name = "007_tuna_fish_can"
+  # obj_name = "010_potted_meat_can"
+  # obj_name = "014_lemon"
+  # obj_name = "025_mug"
+  # obj_name = "033_spatula"
+  # obj_name = "048_hammer"
+  obj_name = "061_foam_brick"
+  parser.add_argument('--mesh_file', type=str, default=f'{ycb_base_path}{obj_name}/textured.obj')
+  parser.add_argument('--test_scene_dir', type=str, default=f"{user_home}/calibration/eyeinhand_nerf1/{scene_name}")
+  # parser.add_argument('--test_scene_dir', type=str, default=f'{code_dir}/demo_data/{obj_name}')
   parser.add_argument('--est_refine_iter', type=int, default=5)
   parser.add_argument('--track_refine_iter', type=int, default=2)
   parser.add_argument('--debug', type=int, default=1)
@@ -91,9 +93,11 @@ if __name__=='__main__':
   est = FoundationPose(model_pts=mesh.vertices, model_normals=mesh.vertex_normals, mesh=mesh, scorer=scorer, refiner=refiner, debug_dir=debug_dir, debug=debug, glctx=glctx)
   logging.info("estimator initialization done")
 
-  reader = YcbineoatReader(video_dir=args.test_scene_dir, shorter_side=None, zfar=np.inf)
+  reader = YcbineoatReader(video_dir=args.test_scene_dir, shorter_side=None, zfar=np.inf, obj_name=obj_name)
 
   for i in range(len(reader.color_files)):
+    if i!=frame_to_estimate-1:
+      continue
     logging.info(f'i:{i}')
     color = reader.get_color(i)
     depth = reader.get_depth(i)
@@ -101,7 +105,7 @@ if __name__=='__main__':
     # depth_vis = cv2.normalize(depth, None, 0, 255, cv2.NORM_MINMAX)
     # cv2.imshow('depth_viz', cv2.applyColorMap(cv2.convertScaleAbs(depth_vis), cv2.COLORMAP_JET))
     # cv2.waitKey(0)
-    if i==0:
+    if i==frame_to_estimate-1:
       mask = reader.get_mask(0).astype(bool)
       pose = est.register(K=reader.K, rgb=color, depth=depth, ob_mask=mask, iteration=args.est_refine_iter)
 
@@ -119,13 +123,13 @@ if __name__=='__main__':
     os.makedirs(f'{debug_dir}/ob_in_cam', exist_ok=True)
     np.savetxt(f'{debug_dir}/ob_in_cam/{reader.id_strs[i]}.txt', pose.reshape(4,4))
     # mesh in cam frame
-    if i ==0:
+    if i==frame_to_estimate-1:
       data = {
       "cam_T_mesh":pose.reshape(4,4).tolist(),
       "frame":os.path.basename(reader.color_files[i]),
-      "object_id":os.path.basename(args.test_scene_dir)
+      "object_id":obj_name
       }
-      with open(args.test_scene_dir+f'/{data["object_id"]}.json', 'w') as fp:
+      with open(args.test_scene_dir+f'/foundation_pose/poses/{data["object_id"]}.json', 'w') as fp:
         json.dump(data, fp, indent=4)
 
     if debug>=1:

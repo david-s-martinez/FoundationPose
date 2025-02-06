@@ -55,11 +55,15 @@ def get_bop_video_dirs(dataset):
 
 
 class YcbineoatReader:
-  def __init__(self,video_dir, downscale=1, shorter_side=None, zfar=np.inf):
+  def __init__(self,video_dir, downscale=1, shorter_side=None, zfar=np.inf, obj_name = ""):
     self.video_dir = video_dir
     self.downscale = downscale
     self.zfar = zfar
+    self.obj_name = obj_name
     self.color_files = sorted(glob.glob(f"{self.video_dir}/rgb/*.png"))
+    self.is_f3rm = self.color_files == []
+    if self.is_f3rm:
+      self.color_files = sorted(glob.glob(f"{self.video_dir}/images/*.png"))
     self.K = np.loadtxt(f'{video_dir}/cam_K.txt').reshape(3,3)
     self.id_strs = []
     for color_file in self.color_files:
@@ -110,7 +114,10 @@ class YcbineoatReader:
     return color
 
   def get_mask(self,i):
-    mask = cv2.imread(self.color_files[i].replace('rgb','masks'),-1)
+    if self.is_f3rm:
+      mask = cv2.imread(os.path.dirname(self.color_files[i].replace('images','masks'))+f"/{self.obj_name}.png",-1)
+    else:
+      mask = cv2.imread(self.color_files[i].replace('rgb','masks'),-1)
     if len(mask.shape)==3:
       for c in range(3):
         if mask[...,c].sum()>0:
@@ -120,7 +127,10 @@ class YcbineoatReader:
     return mask
 
   def get_depth(self,i):
-    depth = cv2.imread(self.color_files[i].replace('rgb','depth').replace('frame','depth'),cv2.IMREAD_UNCHANGED)/1e3
+    if self.is_f3rm:
+      depth = cv2.imread(self.color_files[i].replace('images','depth').replace('frame','depth'),cv2.IMREAD_UNCHANGED)/1e3
+    else:
+      depth = cv2.imread(self.color_files[i].replace('rgb','depth').replace('frame','depth'),cv2.IMREAD_UNCHANGED)/1e3
     depth = cv2.resize(depth, (self.W,self.H), interpolation=cv2.INTER_NEAREST)
     depth[(depth<0.001) | (depth>=self.zfar)] = 0
     return depth
