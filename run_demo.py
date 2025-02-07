@@ -16,18 +16,32 @@ if __name__=='__main__':
   parser = argparse.ArgumentParser()
   code_dir = os.path.dirname(os.path.realpath(__file__))
   user_home = "/home/david.martinez"
-  scene_name = "img_ycb_scene"
+  scene_name = "img_ycb_scene_5"
+  scene_base_path = f"{user_home}/calibration/eyeinhand_nerf1/{scene_name}"
   ycb_base_path = f"{user_home}/isaac_sim_grasping/gazebo-objects/objects_gazebo/ycb/"
   frame_to_estimate = 13
-  # obj_name = "007_tuna_fish_can"
-  # obj_name = "010_potted_meat_can"
-  # obj_name = "014_lemon"
-  # obj_name = "025_mug"
-  # obj_name = "033_spatula"
-  # obj_name = "048_hammer"
-  obj_name = "061_foam_brick"
+  obj_names = [os.path.basename(d).replace(".png","") for d in glob.glob(os.path.join(scene_base_path+"/masks/", "*"))]
+  obj_options = {str(i): option for i, option in enumerate(obj_names)}
+  obj_name = obj_options[str(input(f"{obj_options} \n Type number for object to pick: "))]
+  
+  # Current Objects:
+  #"007_tuna_fish_can"
+  #"010_potted_meat_can"
+  #"014_lemon"
+  #"025_mug"
+  #"033_spatula"
+  #"048_hammer"
+  #"061_foam_brick"
+  #"018_plum"
+  #"004_sugar_box"
+  #"012_strawberry"
+  #"035_power_drill"
+  #"008_pudding_box"
+  #"006_mustard_bottle"
+  #"005_tomato_soup_can"
+
   parser.add_argument('--mesh_file', type=str, default=f'{ycb_base_path}{obj_name}/textured.obj')
-  parser.add_argument('--test_scene_dir', type=str, default=f"{user_home}/calibration/eyeinhand_nerf1/{scene_name}")
+  parser.add_argument('--test_scene_dir', type=str, default=scene_base_path)
   # parser.add_argument('--test_scene_dir', type=str, default=f'{code_dir}/demo_data/{obj_name}')
   parser.add_argument('--est_refine_iter', type=int, default=5)
   parser.add_argument('--track_refine_iter', type=int, default=2)
